@@ -65,6 +65,9 @@ public:
                 std::memory_order_acquire
             )
         );
+        val = old_head.ptr->value;
+        delete [] old_head.ptr;
+        return true;
     }
 };
 
