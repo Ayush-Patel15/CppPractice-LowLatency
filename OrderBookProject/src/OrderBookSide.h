@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <new>
+#include <utility>
 
 /////////////////////////////// Order struct ////////////////////////////////////
 struct Order{
@@ -25,6 +27,17 @@ struct PriceLevel {
     int64_t order_count{0};
     bool active{false};
     Order* head{nullptr};
+    Order* tail{nullptr};
+};
+
+
+/////////////////////////////// Fill Event struct /////////////////////////////
+struct Fill{
+    int incoming_order_id;
+    int existing_order_id;
+    int64_t price_ticks;
+    int64_t exec_qty;
+    bool incoming_is_buy;
 };
 
 
@@ -49,6 +62,9 @@ private:
 
     // Look up by id
     Order* order_lookup[MAX_ORDERS];
+
+    // A function: for fill
+    std::function<void(const Fill&)> on_fill;
 
 public:
     // The constructor
@@ -81,14 +97,19 @@ public:
 
     // Method: Add an Order to a PriceLevel
     void addOrderToLevel(PriceLevel& level, Order* o){
-        o->next = level.head;
-        o->prev = nullptr;
-        // If head exists, move to current
-        if(level.head){
-            level.head->prev = o;
+        // To add at the tail, so FIFO is followed
+        o->prev = level.tail;
+        o->next = nullptr;
+        // If tail exists, point the next to new order
+        if(level.tail){
+            level.tail->next = o;
+        }
+        // If it's the first order
+        if(!level.head){
+            level.head = o;
         }
         // action on all others
-        level.head = o;
+        level.tail = o;
         level.total_quantity += o->quantity;
         level.order_count++;
         level.active = true;
@@ -108,11 +129,17 @@ public:
         if(level.head == o){
             level.head = o->next;
         }
+        // If the last order from the price level
+        if(level.tail == 0){
+            level.tail = o->prev;
+        }
         // Remove the quantity
         level.total_quantity -= o->quantity;
         level.order_count--;
         if(level.order_count == 0){
             level.active = false;
+            level.head = nullptr;
+            level.tail = nullptr;
         }
     }
 
@@ -158,7 +185,7 @@ public:
         int64_t remaining_qty = quantity;
         if(is_buy){
             while(remaining_qty > 0 && hasAsks() && price_tick >= indexToPrice(best_ask_index)){
-                remaining_qty = matchAgainstLevel(ask_levels[best_ask_index], remaining_qty, order_id);
+                remaining_qty = matchAgainstLevel(ask_levels[best_ask_index], remaining_qty, order_id, is_buy);
                 if(ask_levels[best_ask_index].order_count == 0){
                     // As need to reset the best ask index
                     resetBestIndex(false);
@@ -167,7 +194,7 @@ public:
         }
         else{
             while(remaining_qty > 0 && hasBids() && price_tick <= indexToPrice(best_bid_index)){
-                remaining_qty = matchAgainstLevel(bid_levels[best_bid_index], remaining_qty, order_id);
+                remaining_qty = matchAgainstLevel(bid_levels[best_bid_index], remaining_qty, order_id, is_buy);
                 if(bid_levels[best_bid_index].order_count == 0){
                     // To reset the bid index
                     resetBestIndex(true);
@@ -211,10 +238,22 @@ public:
     }
 
     // Method: To match against the price level
-    int64_t matchAgainstLevel(PriceLevel& level, int64_t incoming_qty, int order_id){
+    int64_t matchAgainstLevel(PriceLevel& level, int64_t incoming_qty, int order_id, bool incoming_is_buy){
         Order* curr = level.head;
         while (curr && incoming_qty > 0){
             int64_t fill_qty = std::min(incoming_qty, curr->quantity);
+            // Call the Fill event, after a matching qty
+            if(on_fill){
+                try{
+                    on_fill(
+                        Fill{order_id, curr->order_id, curr->price_ticks, fill_qty, incoming_is_buy}
+                    );
+                }
+                catch (...){
+                    // Log and continue to next fill, doesn't disrupt the order book state or addOrder call stack
+                }
+                
+            }
             // Decrement it
             incoming_qty -= fill_qty;
             level.total_quantity -= fill_qty;
@@ -232,4 +271,9 @@ public:
         return incoming_qty;
     }
 
+    // Method: A callback for the Fill event or fill std::function
+    void setFillCallback(std::function<void(const Fill&)> cb){
+        on_fill = std::move(cb);
+        return;
+    }
 };
