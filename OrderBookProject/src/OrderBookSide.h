@@ -95,6 +95,16 @@ public:
         return best_ask_index != MAX_LEVELS;
     }
 
+    // Getter: To get the best bid price
+    int64_t getBestBidPrice() const {
+        return hasBids() ? indexToPrice(best_bid_index) : 0;
+    }
+
+    // Getter: To get the best ask price
+    int64_t getBestAskPrice() const{
+        return hasAsks() ? indexToPrice(best_ask_index) : 0;
+    }
+
     // Method: Add an Order to a PriceLevel
     void addOrderToLevel(PriceLevel& level, Order* o){
         // To add at the tail, so FIFO is followed
