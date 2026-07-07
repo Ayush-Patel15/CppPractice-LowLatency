@@ -190,7 +190,12 @@ public:
     }
 
     // Method: To add the order
-    void addOrder(int order_id, int64_t price_tick, int64_t quantity, bool is_buy){
+    bool addOrder(int order_id, int64_t price_tick, int64_t quantity, bool is_buy){
+        // Check for index in-bound or not
+        int index = priceToIndex(price_tick);
+        if(index < 0 || index >= MAX_LEVELS){
+            return false;
+        }
         // First check for the order to match or fill
         int64_t remaining_qty = quantity;
         if(is_buy){
@@ -215,6 +220,9 @@ public:
         if(remaining_qty > 0){
             // Take the memory
             void* raw = order_pool.allocate();
+            if(raw == nullptr){
+                return false;
+            }
             Order* o = new(raw) Order{order_id, price_tick, remaining_qty, is_buy, true, nullptr, nullptr};
             // Get the price level - and add
             PriceLevel& level = is_buy ? bid_levels[priceToIndex(price_tick)] : ask_levels[priceToIndex(price_tick)];
@@ -224,7 +232,7 @@ public:
             // Update the best index
             updateBestIndex(priceToIndex(price_tick), is_buy);
         }
-        return;
+        return true;
     }
 
     // Method: To cancle a order

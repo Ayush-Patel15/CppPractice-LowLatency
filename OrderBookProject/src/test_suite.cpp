@@ -168,6 +168,23 @@ void test_poolBalance(){
     CHECK(book.hasBids() || book.hasAsks());
 }
 
+// ── Test 11: Price Overflow, returns false ─────────────────────
+void test_priceOverflowRejected(){
+    TEST("Price outside representable range is rejected, not corrupting memory");
+    OrderBookSide book(900);   // valid range: [900, 900+2048) = [900, 2948)
+
+    bool result_valid   = book.addOrder(1, 1000, 100, true);   // in range
+    bool result_too_low = book.addOrder(2, 500,  100, true);   // below base — invalid
+    bool result_too_high= book.addOrder(3, 5000, 100, true);   // way above range — invalid
+
+    CHECK(result_valid   == true);
+    CHECK(result_too_low == false);
+    CHECK(result_too_high== false);
+
+    // book state should be unaffected by the rejected orders
+    CHECK(book.hasBids() == true);   // only order 1 should be resting
+}
+
 // ── Runner ─────────────────────────────────────────────────
 int main(){
     test_basicRestingOrder();
@@ -180,6 +197,7 @@ int main(){
     test_cancelUnknownOrder();
     test_neverCrossed();
     test_poolBalance();
+    test_priceOverflowRejected();
 
     printTestSummary();
     return g_failed_checks == 0 ? 0 : 1;   // non-zero exit code on failure — useful for CI later
