@@ -185,6 +185,33 @@ void test_priceOverflowRejected(){
     CHECK(book.hasBids() == true);   // only order 1 should be resting
 }
 
+// --- Aggressive sell test suite ---
+void test_aggressiveSellMatchesFIFO(){
+    TEST("Aggressive sell matches against bids in FIFO order");
+    std::vector<Fill> fills;
+    OrderBookSide book(900);
+    book.setFillCallback([&](const Fill& f){ fills.push_back(f); });
+
+    // 3 existing bids at the same price, arriving in order
+    book.addOrder(1, 1000, 50, true);
+    book.addOrder(2, 1000, 50, true);
+    book.addOrder(3, 1000, 50, true);
+
+    // aggressive sell — willing to accept as low as 990, sells 150 total
+    bool ok = book.addOrder(4, 990, 150, false);
+
+    CHECK(ok == true);
+    CHECK(fills.size() == 3);
+    if(fills.size() == 3){
+        CHECK(fills[0].existing_order_id == 1);
+        CHECK(fills[1].existing_order_id == 2);
+        CHECK(fills[2].existing_order_id == 3);
+        CHECK(fills[0].price_ticks == 1000);   // executes at EXISTING bid price, not 990
+    }
+    CHECK(book.hasBids() == false);
+}
+
+
 // ── Runner ─────────────────────────────────────────────────
 int main(){
     test_basicRestingOrder();
@@ -198,6 +225,7 @@ int main(){
     test_neverCrossed();
     test_poolBalance();
     test_priceOverflowRejected();
+    test_aggressiveSellMatchesFIFO();
 
     printTestSummary();
     return g_failed_checks == 0 ? 0 : 1;   // non-zero exit code on failure — useful for CI later

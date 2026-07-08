@@ -4,6 +4,7 @@
 #include "OrderBookSide.h"
 #include "RdtscTimer.h"
 #include <iostream>
+#include <memory>
 #include <vector>
 #include <cstdlib>
 
@@ -18,18 +19,22 @@
 
 // The main function
 int main(){
-    static const int WARMUP_ITERATIONS = 1'000;
-    static const int MEASURE_ITERATIONS = 10'000;
+    static const int WARMUP_ITERATIONS = 100'000;
+    static const int MEASURE_ITERATIONS = 1'000'000;
     static const int TOTAL_EVENTS = WARMUP_ITERATIONS + MEASURE_ITERATIONS;
+    static int rejected_order = 0;
 
     // Initialize everything
     LatencyHistogram add_hist, cancel_hist, aggresive_hist;
     MarketDataGenerator event_generator;
-    OrderBookSide order_book(900);
+    auto order_book = std::make_unique<OrderBookSide>(900);
+    // std::unique_ptr<OrderBookSide> order_book = std::make_unique<OrderBookSide>(900);
     RdtscTimer timer;
 
+    // Set a callback
+    order_book->setFillCallback([](const Fill&){});
+
     // Pre-generate the events
-    
     std::vector<MarketDataGenerator::Event> all_events;
     all_events.reserve(TOTAL_EVENTS);
     for(int i=0; i<TOTAL_EVENTS; i++){
@@ -42,10 +47,12 @@ int main(){
         switch (e.event_type) {
             case MarketDataGenerator::EventType::ADD:
             case MarketDataGenerator::EventType::AGGRESSIVE:
-                order_book.addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
+                if(!order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy)){
+                    rejected_order++;
+                };
                 break;
             case MarketDataGenerator::EventType::CANCEL:
-                order_book.cancelOrder(e.order_id);
+                order_book->cancelOrder(e.order_id);
                 break;
         }
     }
@@ -58,11 +65,13 @@ int main(){
         timer.start();
         switch(e.event_type){
             case MarketDataGenerator::EventType::ADD:
-            case MarketDataGenerator::EventType::AGGRESSIVE:
-                order_book.addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
+            case MarketDataGenerator::EventType::AGGRESSIVE:{
+                bool status = order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
+                if(!status) rejected_order++;
                 break;
+            }
             case MarketDataGenerator::EventType::CANCEL:
-                order_book.cancelOrder(e.order_id);
+                order_book->cancelOrder(e.order_id);
                 break;
         }
         timer.end();
@@ -90,5 +99,6 @@ int main(){
     aggresive_hist.print("AggresiveOrder");
     cancel_hist.print("CancelOrder");
 
-    
+    // cout the rejected orders
+    std::cout << "\nCount of rejected orders: " << rejected_order << "\n";
 }

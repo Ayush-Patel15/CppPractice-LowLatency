@@ -46,7 +46,7 @@ class OrderBookSide{
 private:
     // constants
     static const int MAX_LEVELS = 2048;
-    static const int MAX_ORDERS = 50'000;
+    static const int MAX_ORDERS = 1'500'000;
 
     // Price levels
     PriceLevel bid_levels[MAX_LEVELS];
@@ -140,7 +140,7 @@ public:
             level.head = o->next;
         }
         // If the last order from the price level
-        if(level.tail == 0){
+        if(level.tail == o){
             level.tail = o->prev;
         }
         // Remove the quantity
