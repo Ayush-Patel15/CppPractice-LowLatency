@@ -7,6 +7,9 @@
 #include <memory>
 #include <vector>
 #include <cstdlib>
+// For page faults benchmarking
+#include <sys/resource.h>
+#include <sys/time.h>
 
 // // For confirming zero heap allocations
 // static int g_alloc_count;
@@ -16,6 +19,13 @@
 //     return malloc(size);
 // }
 
+// Function: To get the minor page faults
+long getMinorPageFaults(){
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_minflt;
+}
+
 
 // The main function
 int main(){
@@ -23,6 +33,7 @@ int main(){
     static const int MEASURE_ITERATIONS = 1'000'000;
     static const int TOTAL_EVENTS = WARMUP_ITERATIONS + MEASURE_ITERATIONS;
     static int rejected_order = 0;
+    static int partially_filled_orders = 0;
 
     // Initialize everything
     LatencyHistogram add_hist, cancel_hist, aggresive_hist;
@@ -46,16 +57,20 @@ int main(){
         auto& e = all_events[i];
         switch (e.event_type) {
             case MarketDataGenerator::EventType::ADD:
-            case MarketDataGenerator::EventType::AGGRESSIVE:
-                if(!order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy)){
-                    rejected_order++;
-                };
+            case MarketDataGenerator::EventType::AGGRESSIVE:{
+                AddOrderState state = order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
+                if(state == AddOrderState::REJECTED) rejected_order++;
+                else if(state == AddOrderState::PARTIALLY_FILLED) partially_filled_orders++;
                 break;
+            }
             case MarketDataGenerator::EventType::CANCEL:
                 order_book->cancelOrder(e.order_id);
                 break;
         }
     }
+
+    // Page fault before measurement
+    long page_fault_before = getMinorPageFaults();
 
     // g_alloc_count = 0;
 
@@ -66,8 +81,9 @@ int main(){
         switch(e.event_type){
             case MarketDataGenerator::EventType::ADD:
             case MarketDataGenerator::EventType::AGGRESSIVE:{
-                bool status = order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
-                if(!status) rejected_order++;
+                AddOrderState status = order_book->addOrder(e.order_id, e.price_tick, e.quantity, e.is_buy);
+                if(status == AddOrderState::REJECTED) rejected_order++;
+                else if(status == AddOrderState::PARTIALLY_FILLED) partially_filled_orders++;
                 break;
             }
             case MarketDataGenerator::EventType::CANCEL:
@@ -90,8 +106,16 @@ int main(){
         }
     }
 
+    // Page fault after measurement
+    long page_fault_after = getMinorPageFaults();
+
     // For heap allocation - before the print() function, so to skip the std::string heap allocation
     // std::cout << "\nCount of heap allocation, via new: " << g_alloc_count << "\n";
+
+    // For page faults
+    std::cout << "\nPage faults, before measurement: " << page_fault_before << "\n";
+    std::cout << "\nPage faults, after measurement: " << page_fault_after << "\n";
+    std::cout << "\nPage faults, during measurement: " << page_fault_after - page_fault_before << "\n";
 
     // The final orderbook measurement
     std::cout << "\n======= OrderBook Measurment ===========" << "\n";
@@ -99,6 +123,7 @@ int main(){
     aggresive_hist.print("AggresiveOrder");
     cancel_hist.print("CancelOrder");
 
-    // cout the rejected orders
+    // cout the orders
     std::cout << "\nCount of rejected orders: " << rejected_order << "\n";
+    std::cout << "\nCount of partially filed orders: " << partially_filled_orders << "\n";
 }

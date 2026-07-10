@@ -41,7 +41,7 @@ public:
         assert(memory_block != MAP_FAILED);
 
         // Pre-fault the pages
-        memset(memory_block, 0, total_size);
+        std::memset(memory_block, 0, total_size);
 
         // Assign the head pointer
         head = nullptr;
