@@ -72,7 +72,8 @@ int main(){
     // Page fault before measurement
     long page_fault_before = getMinorPageFaults();
 
-    // g_alloc_count = 0;
+    // For new operator
+    // int new_alloc_before = g_alloc_count;
 
     // Actual measurement iterations
     for(int i=WARMUP_ITERATIONS; i<TOTAL_EVENTS; i++){
@@ -109,13 +110,18 @@ int main(){
     // Page fault after measurement
     long page_fault_after = getMinorPageFaults();
 
-    // For heap allocation - before the print() function, so to skip the std::string heap allocation
-    // std::cout << "\nCount of heap allocation, via new: " << g_alloc_count << "\n";
+    // New alloc count
+    // int new_alloc_after = g_alloc_count;
 
     // For page faults
     std::cout << "\nPage faults, before measurement: " << page_fault_before << "\n";
     std::cout << "\nPage faults, after measurement: " << page_fault_after << "\n";
     std::cout << "\nPage faults, during measurement: " << page_fault_after - page_fault_before << "\n";
+
+    // // For new alloc count
+    // std::cout << "\nNew alloc, before measurement: " << new_alloc_before << "\n";
+    // std::cout << "\nNew alloc, after measurement: " << new_alloc_after << "\n";
+    // std::cout << "\nNew alloc, during measurement: " << new_alloc_after - new_alloc_before << "\n";
 
     // The final orderbook measurement
     std::cout << "\n======= OrderBook Measurment ===========" << "\n";
