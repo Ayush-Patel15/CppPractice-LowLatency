@@ -4,7 +4,6 @@
 #include "MarketDataGenrator.h"
 #include "OrderBookSide.h"
 #include "RdtscTimer.h"
-#include <atomic>
 #include <iostream>
 #include <memory>
 #include <thread>
@@ -12,6 +11,9 @@
 // For page faults benchmarking
 #include <sys/resource.h>
 #include <sys/time.h>
+// For Cpu pinnig
+#include <pthread.h>
+#include <sched.h>
 
 // // For confirming zero heap allocations
 // static int g_alloc_count;
@@ -26,6 +28,24 @@ long getMinorPageFaults(){
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
     return usage.ru_minflt;
+}
+
+// Function to pin the thread to CPU core
+void pinToThread(int core_id){
+    // Initialize and clear
+    cpu_set_t cpu_set;
+    CPU_ZERO(&cpu_set);
+    CPU_SET(core_id, &cpu_set);
+
+    int result = pthread_setaffinity_np(
+        pthread_self(),
+        sizeof(cpu_set),
+        &cpu_set
+    );
+    // If fails
+    if(result != 0){
+        throw std::runtime_error("Thread assignment to core: " + std::to_string(core_id) + " is failed");;
+    }
 }
 
 
@@ -51,6 +71,7 @@ int main(){
     // The producer thread to produce
     std::jthread producer([&](){
         MarketDataGenerator event;
+        pinToThread(2);
         for(int i=0; i<TOTAL_EVENTS; i++){
             MarketDataGenerator::Event e = event.nextEvent();
             while(!queue.push(e));
@@ -60,6 +81,7 @@ int main(){
     // The consumer thread to consume
     std::jthread consumer([&](){
         MarketDataGenerator::Event e;
+        pinToThread(3);
         long processed = 0;
         while(processed < TOTAL_EVENTS){
             while(!queue.pop(e)) continue;
