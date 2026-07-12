@@ -51,12 +51,12 @@ void pinToThread(int core_id){
 
 // The main function
 int main(){
-    static const int WARMUP_ITERATIONS = 100'000;
-    static const int MEASURE_ITERATIONS = 1'000'000;
-    static const int TOTAL_EVENTS = WARMUP_ITERATIONS + MEASURE_ITERATIONS;
+    static constexpr int WARMUP_ITERATIONS = 100'000;
+    static constexpr int MEASURE_ITERATIONS = 1'000'000;
+    static constexpr int TOTAL_EVENTS = WARMUP_ITERATIONS + MEASURE_ITERATIONS;
     static int rejected_order = 0;
     static int partially_filled_orders = 0;
-    const size_t QUEUE_SIZE = 1024;
+    constexpr size_t QUEUE_SIZE = 1024;
 
     // Initialize everything
     LatencyHistogram add_hist, cancel_hist, aggresive_hist;

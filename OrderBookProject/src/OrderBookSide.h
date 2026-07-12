@@ -53,7 +53,7 @@ enum class AddOrderState {
 class OrderLookUpTable{
 private:
     // max size
-    static const int MAX_SLOTS = 1 << 20;
+    static constexpr int MAX_SLOTS = 1 << 20;
 
     // The slot
     struct LookUpSlot{
@@ -138,8 +138,8 @@ public:
 class OrderBookSide{
 private:
     // constants
-    static const int MAX_LEVELS = 2048;
-    static const int MAX_CONCURRENT_ORDERS = 500'000;
+    static constexpr int MAX_LEVELS = 2048;
+    static constexpr int MAX_CONCURRENT_ORDERS = 500'000;
 
     // Price levels
     PriceLevel bid_levels[MAX_LEVELS];

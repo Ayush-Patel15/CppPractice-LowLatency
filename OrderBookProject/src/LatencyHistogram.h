@@ -13,7 +13,7 @@
 class LatencyHistogram{
 private:
     // attributes
-    static const int BUCKETS = 64;
+    static constexpr int BUCKETS = 64;
     std::array<uint64_t, BUCKETS> buckets_arr{};
     uint64_t total_count{0};
     uint64_t total_sum{0};
